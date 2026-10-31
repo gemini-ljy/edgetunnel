@@ -1,0 +1,20 @@
+# CI deployment config for edgetunnel.
+#
+# Kept separate from the upstream `wrangler.toml` on purpose: upstream rewrites
+# the `name` field there on every release (currently "v20251104"), and editing
+# that file inside the fork would collide with the daily upstream-sync merge.
+# This file is ours alone, so upstream never touches it.
+
+name = "edgetunnel"
+main = "_worker.js"
+compatibility_date = "2025-11-04"
+
+# Preserve variables set at runtime through the admin panel across redeploys.
+keep_vars = true
+
+# Serve on the account's workers.dev subdomain.
+workers_dev = true
+
+[[kv_namespaces]]
+binding = "KV"
+id = "dec45813ed484e5fb283eca36d2844ca"
