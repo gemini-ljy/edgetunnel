@@ -20,24 +20,35 @@ jobs:
             code=$(curl -s -o /tmp/out.json -w "%{http_code}" -X "$method" \
               -H "Authorization: Bearer $CF_TOKEN" \
               -H "Content-Type: application/json" \
-              "https://api.cloudflare.com/client/v4$path")
+              "https://api.cloudflare.com/client/v4$path" "$@")
             echo "--- $label | $method $path -> HTTP $code"
-            head -c 400 /tmp/out.json | tr -d '\n'
+            head -c 300 /tmp/out.json | tr -d '\n'
             echo ""
           }
-          probe "0 token-verify"        GET "/user/tokens/verify"
-          probe "1 account-read"        GET "/accounts/$CF_ACCOUNT"
-          probe "2 account-settings"    GET "/accounts/$CF_ACCOUNT/workers/account-settings"
-          probe "3 workers-subdomain"   GET "/accounts/$CF_ACCOUNT/workers/subdomain"
-          probe "4 scripts-list"        GET "/accounts/$CF_ACCOUNT/workers/scripts"
-          probe "5 script-settings"     GET "/accounts/$CF_ACCOUNT/workers/scripts/edgetunnel/settings"
-          probe "6 script-secrets"      GET "/accounts/$CF_ACCOUNT/workers/scripts/edgetunnel/secrets"
-          probe "7 script-content"      GET "/accounts/$CF_ACCOUNT/workers/scripts/edgetunnel/content"
-          probe "8 worker-domains"      GET "/accounts/$CF_ACCOUNT/workers/domains"
-          probe "9 kv-namespaces"       GET "/accounts/$CF_ACCOUNT/storage/kv/namespaces"
-          probe "10 kv-value"           GET "/accounts/$CF_ACCOUNT/storage/kv/namespaces/dec45813ed484e5fb283eca36d2844ca/values/config.json"
-          probe "11 zone-lookup"        GET "/zones?name=fq.bwcx5935.com"
-          probe "12 zone-read"          GET "/zones/df305adf94604a9371b2ca44d24c6bbc"
-          probe "13 zone-worker-routes" GET "/zones/df305adf94604a9371b2ca44d24c6bbc/workers/routes"
-          probe "14 zone-dns"           GET "/zones/df305adf94604a9371b2ca44d24c6bbc/dns_records"
-          probe "15 zone-dns-settings"  GET "/zones/df305adf94604a9371b2ca44d24c6bbc/settings"
+          echo "########## ZONE-SCOPED SURFACE ##########"
+          probe "z01 zone-object"      GET "/zones/df305adf94604a9371b2ca44d24c6bbc"
+          probe "z02 zone-list"        GET "/zones?name=bwcx5935.com"
+          probe "z03 zone-settings"    GET "/zones/df305adf94604a9371b2ca44d24c6bbc/settings"
+          probe "z04 zone-dns-records" GET "/zones/df305adf94604a9371b2ca44d24c6bbc/dns_records"
+          probe "z05 zone-dns-settings" GET "/zones/df305adf94604a9371b2ca44d24c6bbc/dns_settings"
+          probe "z06 zone-worker-routes" GET "/zones/df305adf94604a9371b2ca44d24c6bbc/workers/routes"
+          probe "z07 zone-rulesets"    GET "/zones/df305adf94604a9371b2ca44d24c6bbc/rulesets"
+          probe "z08 zone-cache-purge" GET "/zones/df305adf94604a9371b2ca44d24c6bbc/purge_cache"
+          probe "z09 zone-custom-hostnames" GET "/zones/df305adf94604a9371b2ca44d24c6bbc/custom_hostnames"
+          probe "z10 zone-ssl-packs"   GET "/zones/df305adf94604a9371b2ca44d24c6bbc/ssl/certificate_packs"
+          echo "########## ACCOUNT-SCOPED SURFACE ##########"
+          probe "a01 account"          GET "/accounts/$CF_ACCOUNT"
+          probe "a02 workers-subdomain" GET "/accounts/$CF_ACCOUNT/workers/subdomain"
+          probe "a03 scripts"          GET "/accounts/$CF_ACCOUNT/workers/scripts"
+          probe "a04 worker-domains"  GET "/accounts/$CF_ACCOUNT/workers/domains"
+          probe "a05 kv-namespaces"    GET "/accounts/$CF_ACCOUNT/storage/kv/namespaces"
+          probe "a06 kv-list"          GET "/accounts/$CF_ACCOUNT/storage/kv/namespaces/dec45813ed484e5fb283eca36d2844ca/keys"
+          probe "a07 r2-buckets"       GET "/accounts/$CF_ACCOUNT/r2/buckets"
+          probe "a08 d1-databases"     GET "/accounts/$CF_ACCOUNT/d1/database"
+          probe "a09 pages-projects"   GET "/accounts/$CF_ACCOUNT/pages/projects"
+          probe "a10 queues"           GET "/accounts/$CF_ACCOUNT/queues"
+          echo "########## WRITE-PERMISSION TESTS ##########"
+          echo ">>> KV WRITE (scratch key, then cleanup)"
+          probe "w01 kv-put-scratch"   PUT "/accounts/$CF_ACCOUNT/storage/kv/namespaces/dec45813ed484e5fb283eca36d2844ca/values/perm-probe-tmp" -d '{"probe":1}'
+          probe "w02 kv-get-scratch"   GET "/accounts/$CF_ACCOUNT/storage/kv/namespaces/dec45813ed484e5fb283eca36d2844ca/values/perm-probe-tmp"
+          probe "w03 kv-del-scratch"   DELETE "/accounts/$CF_ACCOUNT/storage/kv/namespaces/dec45813ed484e5fb283eca36d2844ca/values/perm-probe-tmp"
