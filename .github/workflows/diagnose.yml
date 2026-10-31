@@ -1,0 +1,43 @@
+name: Diagnose API Token Permissions
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe Cloudflare API endpoints
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          probe() {
+            local label="$1"; shift
+            local method="$1"; shift
+            local path="$1"; shift
+            local code
+            code=$(curl -s -o /tmp/out.json -w "%{http_code}" -X "$method" \
+              -H "Authorization: Bearer $CF_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4$path")
+            echo "--- $label | $method $path -> HTTP $code"
+            head -c 400 /tmp/out.json | tr -d '\n'
+            echo ""
+          }
+          probe "0 token-verify"        GET "/user/tokens/verify"
+          probe "1 account-read"        GET "/accounts/$CF_ACCOUNT"
+          probe "2 account-settings"    GET "/accounts/$CF_ACCOUNT/workers/account-settings"
+          probe "3 workers-subdomain"   GET "/accounts/$CF_ACCOUNT/workers/subdomain"
+          probe "4 scripts-list"        GET "/accounts/$CF_ACCOUNT/workers/scripts"
+          probe "5 script-settings"     GET "/accounts/$CF_ACCOUNT/workers/scripts/edgetunnel/settings"
+          probe "6 script-secrets"      GET "/accounts/$CF_ACCOUNT/workers/scripts/edgetunnel/secrets"
+          probe "7 script-content"      GET "/accounts/$CF_ACCOUNT/workers/scripts/edgetunnel/content"
+          probe "8 worker-domains"      GET "/accounts/$CF_ACCOUNT/workers/domains"
+          probe "9 kv-namespaces"       GET "/accounts/$CF_ACCOUNT/storage/kv/namespaces"
+          probe "10 kv-value"           GET "/accounts/$CF_ACCOUNT/storage/kv/namespaces/dec45813ed484e5fb283eca36d2844ca/values/config.json"
+          probe "11 zone-lookup"        GET "/zones?name=fq.bwcx5935.com"
+          probe "12 zone-read"          GET "/zones/df305adf94604a9371b2ca44d24c6bbc"
+          probe "13 zone-worker-routes" GET "/zones/df305adf94604a9371b2ca44d24c6bbc/workers/routes"
+          probe "14 zone-dns"           GET "/zones/df305adf94604a9371b2ca44d24c6bbc/dns_records"
+          probe "15 zone-dns-settings"  GET "/zones/df305adf94604a9371b2ca44d24c6bbc/settings"
