@@ -1,0 +1,50 @@
+name: Deploy to Cloudflare Workers
+
+# Triggers on every push to main — including the daily upstream-sync merge,
+# so upstream fixes roll out automatically.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never let two deploys overlap (manual trigger racing the nightly sync).
+concurrency:
+  group: deploy-edgetunnel
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Install wrangler
+        run: npm install -g wrangler@latest
+
+      # _worker.js is already a self-contained ES module (no imports), so it is
+      # uploaded as-is instead of being run through the bundler again.
+      - name: Deploy worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: wrangler deploy -c wrangler.ci.toml --no-bundle
+
+      # ADMIN is the admin-panel password. Stored as an encrypted secret, never
+      # as a plain variable and never in the repo.
+      - name: Set ADMIN secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: echo "$ADMIN_PASSWORD" | wrangler secret put ADMIN -c wrangler.ci.toml
